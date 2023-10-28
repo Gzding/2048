@@ -6,6 +6,7 @@ build*
 
 ## files for pack this project's output exe file
 exe*
+*exe
 
 ## VSCode
 .vscode*

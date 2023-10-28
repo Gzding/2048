@@ -10,182 +10,311 @@
 using namespace std;
 
 
-// 构造函数
-Game::Game(){}
-// 析构函数
+Game::Game(int size, int target){
+    if(size<4){
+        cout << "ERROR: the board size is too small" << endl;
+        exit(1);
+    }
+    this->size = size;
+    this->target = target;
+    if(checkTarget()==false){
+        cout << "ERROR: the target is too small or invaild" << endl;
+        exit(1);
+    }
+    grids = vector<vector<int> >(size, vector<int>(size));
+}
+
 Game::~Game(){}
 
-// 初始化游戏
 void Game::init(){
-    // 统计变量置位
-    blankNum = 16;
-    maxNum = 0;
-    score = 0;
+    // 初始化 统计变量
     step = 0;
-    // 棋盘清空：先全部归零
-    for(int i=0; i<4; i++){
-        for(int j=0; j<4; j++){
+    score = 0;
+    maxNum = 0;
+    state = true;
+    blankNum = size*size;
+    // 初始化 棋盘
+    for(int i=0; i<size; i++){
+        for(int j=0; j<size; j++){
             grids[i][j] = 0;
         }
     }
-    // 随机选择两个格子，以大概率填充 2，小概率填充 4
-    // 更新棋盘格子
-    // 更新统计变量
-    int index1 = getRandomIndex(16);
-    int index2 = getRandomIndex(15);
-    int x = getRandomIndex(100);
-    if(x < 98) fillBlank(index1, 2);
-    else fillBlank(index1, 4);
-    x = getRandomIndex(100);
-    if(x < 98) fillBlank(index2, 2);
-    else fillBlank(index2, 4);
-    blankNum -= 2;
+    // 随机选择两个格子填充 2
+    generate();
+    generate();
 }
 
-/// @brief 执行移动操作
-/// @param dir 移动方向 
-/// @return 在这个方向上，有有效的移动或合并操作，返回 true；否则，false
-bool Game::checkAndMove(Direction dir){
-    // 先检查一遍是否有任一方向还能移动
-    if(!check()) return false;
-    
-    // 移动和合并可以移动和合并的所有数字块
-    // 更新统计变量：最大数字块的值、得分、步数、空白块数目
-    int i, j, k;
-    bool moveOrMerge = false; // 有效移动或合并的标志
-    int nums[4] = {0}; // 辅助数组：拷贝一列数值中的所有非零数值，在这个数组内合并可以合并的相同数值
-    // 合并步骤：各个方向都一样，使用 lambda 更简洁
-    auto merge = [&](){
-        // 在拷贝所有非零数值后，剩余的置为 0
-        while(k < 4) nums[k++] = 0;
-        for(k=1; k<4; k++){
-            // 可以合并的条件
-            if(nums[k]>0 && nums[k-1] == nums[k]){
-                // merge
-                nums[k-1] *= 2;
-                nums[k] = 0;
-                // update statistics
-                moveOrMerge = true; // 合并数字块的标志
-                blankNum++; // bug 记录：真离谱！每天都在写奇奇怪怪的bug！这段代码的进入条件不加 nums[k]>0 条件，则此行更新就是 bug！
-                score += nums[k-1];
-                maxNum = maxNum > nums[k-1] ? maxNum : nums[k-1];
-                // skip
-                k++; // 避免重复合并：规则是两个数值合并后，这个数值不能再参与合并
-            }
-        }
-    };
-    // 四个方向：没想出好的简洁的方法，干脆都写一遍
-    if(dir == up){
-        // 对于在这个方向上的每一列数据，独立合并
-        for(j=0; j<=3; j++){
-            // 拷贝所有数字块：数值大于0的
-            for(i=0, k=0; i<=3; i++){
-                if(grids[i][j] > 0){
-                    nums[k++] = grids[i][j];
+bool Game::moveTo(Direction dir){
+    if(state == false) return false;
+
+    // 是否移动、合并的标志
+    bool move = false;
+    bool merge = false;
+
+    // 根据操作方向，先移动，后合并
+    switch(dir){
+        case left:{
+            // 向左移动
+            // 对于每一行分别将非零值都移动到最左边
+            for(int i=0; i<size; i++){
+                int zero = 0; // 记录上次开始寻找 0 值的位置
+                for(int j=1; j<size; j++){
+                    if(grids[i][j] == 0) continue;
+                    // 将当前非零值 grids[i][j] 移动到从头开始的第一个 0 的位置
+                    for(int pre=zero; pre<j; pre++){
+                        if(grids[i][pre]==0){
+                            move = true; // 设置标记
+                            // 移动
+                            grids[i][pre] = grids[i][j];
+                            grids[i][j] = 0;
+                            // 记住这个位置，以便下次加速
+                            zero = pre+1;
+                            break;
+                        }
+                    }
                 }
             }
-            // 判断是否有移动：数字块 -> 空白块
-            // 有移动，拷贝的数值肯定和原来的不一样
-            for(i=0; i<k; i++){
-                if(nums[i] != grids[i][j]) moveOrMerge = true;
+            // 向左合并
+            // 规则：每个数最多参与一次合并
+            // 比如：2 2 2 2 合并结果是 4 4 0 0 而不是 8 0 0 0
+            for(int i=0; i<size; i++){
+                for(int j=1; j<size; j++){
+                    if(grids[i][j]==0) break;
+                    if(grids[i][j-1]==grids[i][j]){
+                        merge = true; // 设置标记
+                        // 合并
+                        grids[i][j-1] *= 2;
+                        grids[i][j] = 0;
+                        // 更新 blankNum
+                        blankNum++;
+                        // 更新 score
+                        score += grids[i][j-1];
+                        // 更新 maxNum
+                        maxNum = (maxNum > grids[i][j-1]) ? maxNum : grids[i][j-1];
+                        // 跳过这个 0
+                        j++;
+                    }
+                }
             }
-            // 合并数字块
-            merge();
-            // 更新：将辅助数组中的非零值拷贝，然后补0
-            for(k=0, i=0; k<=3; k++){
-                if(nums[k] > 0) grids[i++][j] = nums[k];
+            // 再次移动
+            for(int i=0; i<size; i++){
+                int zero = 0;
+                for(int j=1; j<size; j++){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre<j; pre++){
+                        if(grids[i][pre]==0){
+                            grids[i][pre] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre+1;
+                            break;
+                        }
+                    }
+                }
             }
-            while(i < 4) grids[i++][j] = 0;
-        }
-    }else 
-    if(dir == down){
-        for(j=0; j<=3; j++){
-            for(i=3, k=0; i>=0; i--){
-                if(grids[i][j] > 0) nums[k++] = grids[i][j];
+        }break;
+        // 其他三个方向一样的步骤
+        case right:{
+            for(int i=0; i<size; i++){
+                int zero = size-1;
+                for(int j=size-2; j>=0; j--){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre>j; pre--){
+                        if(grids[i][pre]==0){
+                            move = true;
+                            grids[i][pre] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre-1;
+                            break;
+                        }
+                    }
+                }
             }
-            for(i=0; i<k; i++){
-                if(nums[i] != grids[3-i][j]) moveOrMerge = true;
+            for(int i=0; i<size; i++){
+                for(int j=size-2; j>=0; j--){
+                    if(grids[i][j]==0) break;
+                    if(grids[i][j+1]==grids[i][j]){
+                        merge = true;
+                        grids[i][j+1] *= 2;
+                        grids[i][j] = 0;
+                        blankNum++;
+                        score += grids[i][j+1];
+                        maxNum = (maxNum > grids[i][j+1]) ? maxNum : grids[i][j+1];
+                        j--;
+                    }
+                }
             }
-            merge();
-            for(k=0, i=3; k<=3; k++){
-                if(nums[k] > 0) grids[i--][j] = nums[k];
+            for(int i=0; i<size; i++){
+                int zero = size-1;
+                for(int j=size-2; j>=0; j--){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre>j; pre--){
+                        if(grids[i][pre]==0){
+                            move = true;
+                            grids[i][pre] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre-1;
+                            break;
+                        }
+                    }
+                }
             }
-            while(i >= 0) grids[i--][j] = 0;
-        }
-    }else 
-    if(dir == left){
-        for(i=0; i<=3; i++){
-            for(j=0, k=0; j<=3; j++){
-                if(grids[i][j] > 0) nums[k++] = grids[i][j];
+        }break;
+        case up:{
+            for(int j=0; j<size; j++){
+                int zero = 0;
+                for(int i=1; i<size; i++){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre<i; pre++){
+                        if(grids[pre][j]==0){
+                            move = true;
+                            grids[pre][j] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre+1;
+                            break;
+                        }
+                    }
+                }
             }
-            for(j=0; j<k; j++){
-                if(nums[j] != grids[i][j]) moveOrMerge = true;
+            for(int j=0; j<size; j++){
+                for(int i=1; i<size; i++){
+                    if(grids[i][j]==0) break;
+                    if(grids[i-1][j]==grids[i][j]){
+                        merge = true;
+                        grids[i-1][j] *= 2;
+                        grids[i][j] = 0;
+                        blankNum++;
+                        score += grids[i-1][j];
+                        maxNum = (maxNum > grids[i-1][j]) ? maxNum : grids[i-1][j];
+                        i++;
+                    }
+                }
             }
-            merge();
-            for(k=0, j=0; k<=3; k++){
-                if(nums[k] > 0) grids[i][j++] = nums[k];
+            for(int j=0; j<size; j++){
+                int zero = 0;
+                for(int i=1; i<size; i++){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre<i; pre++){
+                        if(grids[pre][j]==0){
+                            move = true;
+                            grids[pre][j] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre+1;
+                            break;
+                        }
+                    }
+                }
             }
-            while(j < 4) grids[i][j++] = 0;
-        }
-    }else 
-    if(dir == right){
-        for(i=0; i<=3; i++){
-            for(j=3, k=0; j>=0; j--){
-                if(grids[i][j] > 0) nums[k++] = grids[i][j];
+        }break;
+        case down:{
+            for(int j=0; j<size; j++){
+                int zero = size-1;
+                for(int i=size-2; i>=0; i--){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre>i; pre--){
+                        if(grids[pre][j]==0){
+                            move = true;
+                            grids[pre][j] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre-1;
+                            break;
+                        }
+                    }
+                }
             }
-            for(j=0; j<k; j++){
-                if(nums[j] != grids[i][3-j]) moveOrMerge = true;
+            for(int j=0; j<size; j++){
+                for(int i=size-2; i>=0; i--){
+                    if(grids[i][j]==0) break;
+                    if(grids[i+1][j]==grids[i][j]){
+                        merge = true;
+                        grids[i+1][j] *= 2;
+                        grids[i][j] = 0;
+                        blankNum++;
+                        score += grids[i+1][j];
+                        maxNum = (maxNum > grids[i+1][j]) ? maxNum : grids[i+1][j];
+                        i--;
+                    }
+                }
             }
-            merge();
-            for(k=0, j=3; k<=3; k++){
-                if(nums[k] > 0) grids[i][j--] = nums[k];
+            for(int j=0; j<size; j++){
+                int zero = size-1;
+                for(int i=size-2; i>=0; i--){
+                    if(grids[i][j] == 0) continue;
+                    for(int pre=zero; pre>i; pre--){
+                        if(grids[pre][j]==0){
+                            move = true;
+                            grids[pre][j] = grids[i][j];
+                            grids[i][j] = 0;
+                            zero = pre-1;
+                            break;
+                        }
+                    }
+                }
             }
-            while(j>=0) grids[i][j--] = 0;
+        }break;
+        default:{
+            cout << "ERROR: error direction" << endl;
         }
     }
-    // 有效操作才算步数
-    if(moveOrMerge) step++;
-    return moveOrMerge;
+
+    // 有效操作则：
+    if(move || merge){
+        // 更新 step
+        step++;
+        if(isSuccess()==false){
+            // 生成一个新的 
+            generate();
+            // 更新游戏状态
+            check();
+        }
+    }
+    
+    return move || merge;
 }
 
-/// @brief 随机生成新数字块：位置随机、数值随机
+bool Game::isSuccess(){
+    return maxNum==target;
+}
+
 void Game::generate(){
     // 在 [0, blankNum) 中随机选择一个数 index
-    // 在棋盘格子中从上到下从左到右依次找到第 index 个空白块
-    // 可以以 step、maxNum 控制的概率分布，随机选择 2、4、8 数字块放在这个空白块
-    // 然后更新统计数据
-    if(blankNum <= 0) return;
-    // cout << "Debug: blankNum=" << blankNum << endl;
-    int index = getRandomIndex(blankNum);
-    int x = getRandomIndex(100);
-    // 分三个等级设置概率分布
-    if(maxNum <= 128){
-        if(x < 98) fillBlank(index, 2);
-        else fillBlank(index, 4);
-    }else if(maxNum <= 512){
-        if(x < 90) fillBlank(index, 2);
-        else if(x < 98) fillBlank(index, 4);
-        else fillBlank(index, 8);
-    }else{
-        if(x < 80) fillBlank(index, 2);
-        else if(x < 95) fillBlank(index, 4);
-        else fillBlank(index, 8);
-    }
-    blankNum--;
-}
+    // 以 maxNum 控制的概率分布，随机选择 2、4、8 填充这个空白块
 
-/// @brief 填充指定的空白块
-/// @param index 从上到下从左到右数，第 index 个空白块（从 0 开始）
-/// @param num 数字块的数值
-void Game::fillBlank(int index, int num){
-    // cout << "Debug: index=" << index << endl;
-    // cout << "Debug: num=" << num << endl;
+    cout << "Debug: blankNum=" << blankNum << endl;
+    if(blankNum <= 0) return;
+
+    // 随机位置 index
+    int index = getRandomNum(blankNum);
+
+    // 填充值
+    int num = 1;
+    // 分三个等级设置 2、4、8 三个数值的概率分布
+    int x = getRandomNum(100);
+    if(maxNum <= 256){
+        // 256 之前：0.98, 0.02, 0
+        num = (x<98) ? 2 : 4;
+    }else if(maxNum <= 1024){
+        // 1024 之前：0.9, 0.08, 0.02
+        num = (x<90) ? 2 : ((x<98) ? 4 : 8);
+    }else{
+        // 最后：0.8, 0.15, 0.05
+        num = (x<80) ? 2 : ((x<95) ? 4 : 8);
+    }
+
+    cout << "Debug: index=" << index << endl;
+    cout << "Debug: num=" << num << endl;
+
+    // 更新 maxNum
     maxNum = maxNum > num ? maxNum : num;
-    for(int i=0; i<4; i++){
-        for(int j=0; j<4; j++){
+
+    // 遍历到第 index 个空白处
+    for(int i=0; i<size; i++){
+        for(int j=0; j<size; j++){
+            // 找到第 index 个 0
             if(grids[i][j] == 0){
                 if(index==0){
                     grids[i][j] = num;
+                    // 更新 blankNum
+                    blankNum--;
                     return;
                 }
                 index--;
@@ -194,36 +323,8 @@ void Game::fillBlank(int index, int num){
     }
 }
 
-/// @brief 检查是否不能再移动了
-/// @return true：我还能操作！ false：欸嘿！又失败了！
-bool Game::check(){
-    // 有空白，肯定还能操作
-    if(blankNum > 0) return true;
-    // 行、列 上有相邻的相同数值，则还能合并
-    for(int i=0; i<4; i++){
-        for(int j=1; j<4; j++){
-            if(grids[i][j-1] == grids[i][j]) return true;
-            if(grids[j-1][i] == grids[j][i]) return true;
-        }
-    }
-    return false;
-}
-
-// 游戏结束时判断游戏是否胜利：To2048
-bool Game::victory(){
-    return maxNum==2048;
-}
-
-// 判断游戏是否结束：不能继续移动了
-bool Game::defeat(){
-    return check()==false;
-}
-
-// 返回值：[0, n) 中的整数（服从均匀分布）
-int Game::getRandomIndex(int n){
-    // 这里若使用 C++ 的 random 库，似乎每次都是同样的随机数
-    srand(time(NULL));
-    return (rand() % n);
+bool Game::getState(){
+    return state;
 }
 
 int Game::getStep(){
@@ -234,30 +335,67 @@ int Game::getScore(){
     return score;
 }
 
+// 不知这里有没有必要给返回值加上 const 修饰
 vector<vector<int> > Game::getGrids(){
-    vector<vector<int> > res(4, vector<int>(4));
-    for(int i=0; i<4; i++){
-        for(int j=0; j<4; j++){
-            res[i][j] = grids[i][j];
-        }
-    }
-    return res;
+    return grids;
 }
 
 // 打印棋盘格子
 void Game::print(){
-    cout << "-----------Game-----------" << endl;
-    for(int i=0; i<4; i++){
+    int width = 2;
+    int tar = target;
+    while(tar > 0){
+        width++;
+        tar /= 10;
+    }
+    cout << setfill('-');
+    cout << setw((width+2)*(size/2+size%2)+2) << "Game" << setw((width+2)*(size/2)-1) << '-' << endl;
+    cout << setfill(' ');
+    for(int i=0; i<size; i++){
         cout << "|";
-        for(int j=0; j<4; j++){
-            if(grids[i][j]>0) cout << setw(5) << grids[i][j];
-            else cout << "     ";
+        for(int j=0; j<size; j++){
+            if(grids[i][j]>0) cout << setw(width) << grids[i][j];
+            else cout << setw(width) << " ";
             cout << " |";
         }
         cout << endl;
-        cout << "----------------------------" << endl;
+        cout << setfill('-');
+        cout << setw((width+2)*size+1) << '-' << endl;
+        cout << setfill(' ');
     }
 }
+
+
+void Game::check(){
+    // 有空白，肯定还能操作
+    if(blankNum > 0) return;
+    // 行、列 上有相邻的相同数值，则还能合并
+    for(int i=0; i<size; i++){
+        for(int j=1; j<size; j++){
+            if(grids[i][j-1] == grids[i][j]) return;
+            if(grids[j-1][i] == grids[j][i]) return;
+        }
+    }
+    // 遍历完没有可合并的，那就是over了
+    state = false;
+}
+
+int Game::getRandomNum(int n){
+    // 这里若使用 C++ 的 random 库，似乎每次都是同样的随机数
+    srand(time(NULL));
+    return (rand() % n);
+}
+
+bool Game::checkTarget(){
+    cout << "Debug: target=" << target << endl;
+    if(target<2048 || target%1024!=0) return false;
+    int tar = target / 1024;
+    while(tar%2 == 0) tar /= 2;
+    return tar==1;
+}
+
+
+
 
 
 // #define __MAIN__
@@ -282,14 +420,14 @@ int main(){
         // 打印棋盘
         game.print();
         // 判断是否结束
-        if(game.defeat()){
-            cout << "Game Over !!!" << endl;
-            break;
-        }
-        if(game.victory()){
-            cout << "Congratulations!" << endl;
-            cout << "Step: " << game.getStep() << endl;
-            cout << "Score: " << game.getScore() << endl;
+        if(game.getState()==false){
+            if(game.isSuccess()){
+                cout << "Congratulations!" << endl;
+                cout << "Step: " << game.getStep() << endl;
+                cout << "Score: " << game.getScore() << endl;
+            }else{
+                cout << "Game Over !!!" << endl;
+            }
             break;
         }
         // 输入命令
@@ -301,9 +439,7 @@ int main(){
             cout << "Key error! Please input correct dirction!" << endl;
         }else{
             // 执行操作，有效执行则生成新数字块
-            if(game.checkAndMove(cmds.at(dir))){
-                game.generate();
-            }
+            game.moveTo(cmds.at(dir));
         }
     }
     return 0;
