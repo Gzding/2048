@@ -1,6 +1,6 @@
 /**
  * @file game.h
- * @brief 
+ * @brief The core class of the game
  * @author Gzding (gzding5.yeah.net)
  * @version 0.1
  * @date 2023-10-28

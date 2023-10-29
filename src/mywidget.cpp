@@ -1,47 +1,57 @@
 #include "mywidget.h"
 
-#include <QKeyEvent>
 #include <QLabel>
-#include <QPixmap>
-#include <QString>
-#include <QFrame>
 
-#include <windows.h>
-#include <string>
+#include <QPainter>
+#include <QFont>
+#include <QString>
+#include <QPoint>
+#include <QColor>
+#include <QRect>
+
 #include <vector>
+#include <cmath>
 
 
 using namespace std;
 
 
-/// @brief 构造：构造时要初始化 labels，大小 4x4，值默认
-/// @param parent 
-MyWidget::MyWidget(QWidget *parent) : QWidget(parent), labels(4, vector<QLabel*>(4))
-{
-    // 加载一次 pixmap
-    loadFigures();
-}
 
-void MyWidget::loadFigures(){
-    string path("./img/");
-    string type(".png");
-    // 总共 12 张图，0 是空白块的贴图
-    vector<string> names({"0", "2", "4", "8", "16", "32", "64", "128", "256", "512", "1024", "2048"});
-    num2figures[0] = QPixmap(string(path+names[0]+type).c_str());
-    for(unsigned int i=1, num=2; i<names.size(); i++, num*=2){
-        num2figures[num] = QPixmap(string(path+names[i]+type).c_str());
-    }
+
+// 先 n 后 game（这是在类声明的顺序）
+MyWidget::MyWidget(QWidget *parent) : QWidget(parent), n(4), game(n, 2048)
+{
+    // 计算一些绘制参数
+    winRatio = 500 / 500.0;
+    fontRatio = winRatio*(4.0/n);
+    gridSize = int(winRatio * 500*0.9 / n);
+    gap = int(gridSize*0.1);
+    o = int(winRatio * 500*0.05 + gap*0.5);
+
+    bg = QMap<int, QColor>({
+        {0, QColor(205, 193, 180)},
+        {2, QColor(45, 132, 196)}, // #2d84c4
+        {4, QColor(60, 169, 238)},
+        {8, QColor(97, 189, 238)},
+        {16, QColor(165, 211, 235)},
+        {32, QColor(255, 255, 255)},
+        {64, QColor(223, 166, 147)},
+        {128, QColor(220, 110, 85)},
+        {256, QColor(225, 75, 50)},
+        {512, QColor(195, 55, 38)},
+        {1024, QColor(192, 152, 255)},
+        {2048, QColor(168, 115, 255)},
+        {4096, QColor(128, 62, 227)},
+        {8192, QColor(104, 45, 187)}
+    });
 }
 
 void MyWidget::initGame(){
-    // 隐藏两个结算界面，结束标志置位
-    victory->setVisible(false);
-    defeat->setVisible(false);
+    // 结束标志
     over = false;
     // 调用游戏核心的初始化
     game.init();
-    // 刷新显示界面
-    updateGrids();
+    update();
 }
 
 void MyWidget::newGame(){
@@ -49,8 +59,9 @@ void MyWidget::newGame(){
     initGame();
 }
 
-void MyWidget::setLabel(QLabel *label, int i, int j){
-    labels[i][j] = label;
+void MyWidget::close(){
+    // 可能需要的操作
+    // cout << "Click EXIT" << endl;
 }
 
 void MyWidget::setScoreLabel(QLabel *label){
@@ -61,65 +72,70 @@ void MyWidget::setStepLabel(QLabel *label){
     step = label;
 }
 
-void MyWidget::setVictoryFrame(QFrame *frame){
-    victory = frame;
-}
 
-void MyWidget::setDefeatFrame(QFrame *frame){
-    defeat = frame;
-}
 
 void MyWidget::move(int dir){
     // 结束后，不执行操作
-    if(over) return;
+    if(over || dir<0 || dir>3) return;
 
-    bool res;
     // 调用核心方法-移动操作，接收返回值：是否是有效的移动操作
-    if(0<=dir && dir<=3) res = game.checkAndMove(Game::Direction(dir));
-    else return;
-    // 是，则调用核心的随机生成方法；否则，直接返回
-    if(res) game.generate();
-    else return;
+    if(game.moveTo(Game::Direction(dir))) update();
     
-    // 更新显示
-    updateGrids();
-    
-    // 更新显示之后，再判断游戏状态
-    if(game.defeat()){
-        // 失败，则显示失败结算界面，并置 结束标志 为 true
+    // 判断是否结束
+    if(game.getState()==false){
         over = true;
-        defeat->setVisible(true);
-    }
-    if(game.victory()){
-        // 成功，则同上
-        over = true;
-        victory->setVisible(true);
+        update();
     }
 }
 
 
-// TODO:
-// - 操作时，操作过快，会导致更新很慢，卡顿；
-// - 原因可能是，不断的复制和加载图片导致的；
-// - 解决方法：。。。
-// TODO:
-// 添加动画效果：label->move()
-void MyWidget::updateGrids(){
-    // get grids value from Game
-    auto grids = game.getGrids();
-    // set pixmap to each label
-    for(int i=0; i<4; i++){
-        for(int j=0; j<4; j++){
-            labels[i][j]->setPixmap(num2figures[grids[i][j]]);
+
+void MyWidget::paintEvent(QPaintEvent *e){
+    vector<vector<int> > newGrids = game.getGrids();
+
+    // cout << "paint" << endl;
+    QPainter painter(this);
+    QRect r;
+
+
+    for(int i=0; i<n; i++){
+        for(int j=0; j<n; j++){
+            r.setRect(o + j*gridSize, o + i*gridSize, gridSize-gap, gridSize-gap);
+            // 外框颜色：透明
+            painter.setPen(Qt::transparent);
+            // 底色
+            // painter.setBrush(QColor(255,250,222,255));
+            painter.setBrush(bg[newGrids[i][j]]);
+            painter.drawRect(r); // 这里注意坐标对应问题，不然会画反
+            if(newGrids[i][j]==0) continue;
+            // 数字颜色、字体
+            int fontSize = int((60-10*int(log10(newGrids[i][j])))*fontRatio);
+            // cout << "fontsize: " << fontSize << endl;
+            painter.setPen(Qt::black);
+            painter.setFont(QFont("Consolas", fontSize)); // 6-20, 5-25, 4-30, 3-40, 2-50, 1-60
+            painter.drawText(QRectF(r), QString::number(newGrids[i][j]), QTextOption(Qt::AlignCenter));
         }
     }
-    // update the score and step
-    score->setText(QString(to_string(game.getScore()).c_str()));
-    step->setText(QString(to_string(game.getStep()).c_str()));
 
-    // sleep a while for update to avoid stucking
-    Sleep(200);
+    score->setText(QString::number(game.getScore()));
+    step->setText(QString::number(game.getStep()));
+
+    if(over){
+        r.setRect(int(winRatio*500*0.1), int(winRatio*500*0.35), int(winRatio*500*0.8), int(winRatio*500*0.3));
+        // 外框颜色：透明
+        painter.setPen(Qt::transparent);
+        // 底色
+        painter.setBrush(QColor(255,250,222,255));
+        painter.drawRect(r); // 这里注意坐标对应问题，不然会画反
+        painter.setFont(QFont("Consolas", int(60*fontRatio)));
+        if(game.isSuccess()){
+            // 颜色、字体
+            painter.setPen(Qt::blue);
+            painter.drawText(QRectF(r), QString("VICTORY!"), QTextOption(Qt::AlignCenter));
+        }else{
+            painter.setPen(Qt::red);
+            painter.drawText(QRectF(r), QString("GAME OVER"), QTextOption(Qt::AlignCenter));
+        }
+    }
 }
-
-
 

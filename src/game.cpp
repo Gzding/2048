@@ -265,6 +265,9 @@ bool Game::moveTo(Direction dir){
             generate();
             // 更新游戏状态
             check();
+        }else{
+            // 成功了，也要设置 state
+            state = false;
         }
     }
     
@@ -279,7 +282,7 @@ void Game::generate(){
     // 在 [0, blankNum) 中随机选择一个数 index
     // 以 maxNum 控制的概率分布，随机选择 2、4、8 填充这个空白块
 
-    cout << "Debug: blankNum=" << blankNum << endl;
+    // cout << "Debug: blankNum=" << blankNum << endl;
     if(blankNum <= 0) return;
 
     // 随机位置 index
@@ -300,8 +303,8 @@ void Game::generate(){
         num = (x<80) ? 2 : ((x<95) ? 4 : 8);
     }
 
-    cout << "Debug: index=" << index << endl;
-    cout << "Debug: num=" << num << endl;
+    // cout << "Debug: index=" << index << endl;
+    // cout << "Debug: num=" << num << endl;
 
     // 更新 maxNum
     maxNum = maxNum > num ? maxNum : num;
@@ -377,7 +380,7 @@ void Game::check(){
         }
     }
     // 遍历完没有可合并的，那就是over了
-    state = false;
+    state = false; // 这里只是设置失败情况时的 state
 }
 
 int Game::getRandomNum(int n){
@@ -387,7 +390,7 @@ int Game::getRandomNum(int n){
 }
 
 bool Game::checkTarget(){
-    cout << "Debug: target=" << target << endl;
+    // cout << "Debug: target=" << target << endl;
     if(target<2048 || target%1024!=0) return false;
     int tar = target / 1024;
     while(tar%2 == 0) tar /= 2;

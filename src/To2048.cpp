@@ -1,54 +1,32 @@
 #include "To2048.h"
 
-
-#include <QKeyEvent>
 #include <QPushButton>
-#include <QPixmap>
-#include <QIcon>
+#include <QHBoxLayout>
 
 To2048::To2048(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui_To2048)
 {
+    // 在 ui 设计中：固定了窗口大小，设置了button、label等widget
     ui->setupUi(this);
 
-    // 设置几个 label 的贴图
-    ui->label_img->setPixmap(QPixmap("./img/img.jpg"));
-    ui->label_victory->setPixmap(QPixmap("./img/victory.png"));
-    ui->label_defeat->setPixmap(QPixmap("./img/defeat.png"));
+    // 将 mywidget 插入到 ui 中
+    mywidget.setParent(this);
+    ((QHBoxLayout*)ui->centralWidget->layout())->insertWidget(0, &mywidget);
 
-    // 按钮功能：重新开始游戏
-    connect(ui->button_newGame, &QPushButton::clicked, &mywidget, [=](){std::cout << "clicked\n"; mywidget.newGame();});
-    connect(ui->button_newGame_1, &QPushButton::clicked, &mywidget, [=](){std::cout << "clicked\n"; mywidget.newGame();});
-    connect(ui->button_newGame_2, &QPushButton::clicked, &mywidget, [=](){std::cout << "clicked\n"; mywidget.newGame();});
+    // 固定棋盘大小
+    mywidget.setMaximumWidth(500);
+    mywidget.setMaximumHeight(500);
+    mywidget.setMinimumWidth(500);
+    mywidget.setMinimumHeight(500);
 
+    // 按钮功能：重新开始游戏；关闭游戏调用本类的close，触发closeEvent
+    connect(ui->pushButton_new, &QPushButton::clicked, &mywidget, [=](){mywidget.newGame();});
+    connect(ui->pushButton_exit, &QPushButton::clicked, this, [=](){close();});
 
-    // 将 方块 label 指针 保存到 mywidget，方便调用
-    mywidget.setLabel(ui->label_0_0, 0, 0);
-    mywidget.setLabel(ui->label_0_1, 0, 1);
-    mywidget.setLabel(ui->label_0_2, 0, 2);
-    mywidget.setLabel(ui->label_0_3, 0, 3);
-
-    mywidget.setLabel(ui->label_1_0, 1, 0);
-    mywidget.setLabel(ui->label_1_1, 1, 1);
-    mywidget.setLabel(ui->label_1_2, 1, 2);
-    mywidget.setLabel(ui->label_1_3, 1, 3);
-
-    mywidget.setLabel(ui->label_2_0, 2, 0);
-    mywidget.setLabel(ui->label_2_1, 2, 1);
-    mywidget.setLabel(ui->label_2_2, 2, 2);
-    mywidget.setLabel(ui->label_2_3, 2, 3);
-
-    mywidget.setLabel(ui->label_3_0, 3, 0);
-    mywidget.setLabel(ui->label_3_1, 3, 1);
-    mywidget.setLabel(ui->label_3_2, 3, 2);
-    mywidget.setLabel(ui->label_3_3, 3, 3);
-
-    // 同 上
-    mywidget.setScoreLabel(ui->label_score_v);
-    mywidget.setStepLabel(ui->label_step_v);
-    mywidget.setVictoryFrame(ui->frame_victory);
-    mywidget.setDefeatFrame(ui->frame_defeat);
+    // 给 mywidget label 接口
+    mywidget.setStepLabel(ui->label_step);
+    mywidget.setScoreLabel(ui->label_score);
 
     // 最后，初始化游戏
     mywidget.initGame();
@@ -60,19 +38,24 @@ To2048::~To2048()
 }
 
 
-
-void To2048::keyReleaseEvent(QKeyEvent *event){
-    // 上下左右
-    if(event->key() == Qt::Key_Up){
+void To2048::keyPressEvent(QKeyEvent *e){
+    // cout << "Debug: key="  << endl;
+    if(e->key()==Qt::Key_Up || e->key()==Qt::Key_W){
         mywidget.move(0);
     }
-    if(event->key() == Qt::Key_Down){
+    if(e->key()==Qt::Key_Down || e->key()==Qt::Key_S){
         mywidget.move(1);
     }
-    if(event->key() == Qt::Key_Left){
+    if(e->key()==Qt::Key_Left || e->key()==Qt::Key_A){
         mywidget.move(2);
     }
-    if(event->key() == Qt::Key_Right){
+    if(e->key()==Qt::Key_Right || e->key()==Qt::Key_D){
         mywidget.move(3);
     }
+}
+
+
+void To2048::closeEvent(QCloseEvent *e){
+    // std::cout << "close" << std::endl;
+    mywidget.close();
 }
