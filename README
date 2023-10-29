@@ -2,58 +2,44 @@
 
 To2048 game developed by Qt C++.
 
+Environment
+
+- Qt Creator 5.9 community
+- VSCode and some plugins
+- QMake in the Qt ToolKit — MinGW installed with Qt
+
+
+
+
 ## resources
-
-Please add your coustom images, the list:
-
-- images of all grids
-
-    mywidget.cpp -> MyWidget::loadFigures()
-
-- window icon
-
-    To2048.ui -> widget:QMainWindow -> property:windowIcon
 
 - exe ico
 
-    CMakeLists.txt -> add_executable(${PROJECT_NAME} ...)
-
-    in this struct, add one line to locate your logo.rc
-
-    e.g.
-
-    add "./img/logo.rc"
-
-    ```
-    add_executable(${PROJECT_NAME}
-        WIN32 # If you need a terminal for debug, please comment this statement 
-        ${srcs} 
-        "./img/logo.rc"
-    ) 
-    ```
-
-    and the content of logo.rc file is:
+    for "./img/logo.ico", add "./img/logo.rc", and the content of logo.rc file is:
 
     ```
     IDI_ICON1	ICON	DISCARDABLE	"logo.ico"
     ```
 
-    the files logo.ico and logo.rc are in the same path, e.g. img/
+    the files logo.ico and logo.rc are in the same path, e.g. "img/"
 
-- other img: img.jpg、voctory.png、defeat.png
+    in the *.pro file, add one line
 
-    To2048.cpp -> To2048::To2048()
+    ```
+    RC_FILE = ./img/logo.rc
+    ```
+
+    - don't forget copping img dir when packing the exe file
+
+
+
 
 
 ## TODO LIST
 
 ### Animation
 
-- label.move()
-
 
 ### Optimize
-
-- how to manage the pixmap and label to show the checkerboard efficiently
 
 
