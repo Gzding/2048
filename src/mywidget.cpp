@@ -23,8 +23,8 @@ using namespace std;
 // 先 n 后 game（这是在类声明的顺序）
 MyWidget::MyWidget(QWidget *parent) : QWidget(parent), n(4), game(n, 2048)
 {
-    frameNum = 20; // 每部分动画十帧
-    timer = new QTimer(this); // 每帧10ms
+    frameNum = 20; // 每次移动、缩放动画的总帧数
+    timer = new QTimer(this);
 
     // 计算一些绘制参数
     winRatio = 500 / 500.0;
@@ -52,6 +52,7 @@ MyWidget::MyWidget(QWidget *parent) : QWidget(parent), n(4), game(n, 2048)
 
     rects = QVector<QVector<QRect> >(n, QVector<QRect>(n));
 
+    // 将定时器计时结束信号连接到槽（计时结束事件处理函数）
     connect(timer, &QTimer::timeout, this, &MyWidget::timerTimeout);
 }
 
@@ -70,6 +71,7 @@ void MyWidget::initGame(){
     over = false;
     // 调用游戏核心的初始化
     game.init();
+    // 初始化棋盘
     oldGrids = vector<vector<int> >(n, vector<int>(n, 0));
     newGrids = game.getGrids();
     update();
@@ -101,15 +103,19 @@ void MyWidget::move(int dir){
 
     // 调用核心方法-移动操作，接收返回值：是否是有效的移动操作
     if(game.moveTo(Game::Direction(dir))){
-        direct = Game::Direction(dir);
+        // 操作有效，则需要更新画面
+        // 获取棋盘数据
         oldGrids = newGrids;
         newGrids = game.getGrids();
-        nstep = game.getStep();
-        nscore = game.getScore();
+        score->setText(QString::number(game.getScore()));
+        step->setText(QString::number(game.getStep()));
+        // 获取动画过程需要的数据
         paths = game.getPaths();
         targets = game.getTargets();
+        // 设置参数
         mode = 1;
         curf =0;
+        // 开启定时器
         timer->start(5);
     }
     
@@ -152,37 +158,46 @@ void MyWidget::move(int dir){
 void MyWidget::timerTimeout(){
     // 线性插值
     // 根据当前帧序 curf 等参数计算当前帧，即：各个方块的位置
+    // 先移动
     if(mode == 1){
         if(curf<0 || curf>frameNum) return;
         for(int i=0; i<n; i++){
             for(int j=0; j<n; j++){
+                // 对实际绘制位置插值
                 double x = (curf*(o+paths[i][j][1]*gridSize) + (frameNum-curf)*(o+j*gridSize))*1.0/frameNum;
                 double y = (curf*(o+paths[i][j][0]*gridSize) + (frameNum-curf)*(o+i*gridSize))*1.0/frameNum;
                 rects[i][j].setX(x);
                 rects[i][j].setY(y);
+                // 大小不变
                 rects[i][j].setSize(QSize(gridSize-gap, gridSize-gap));
             }
         }
-        update();
-    }else if(mode == 2){
+    }
+    // 后缩放
+    else if(mode == 2){
         if(curf<0 || curf>frameNum) return;
         for(int i=0; i<n; i++){
             for(int j=0; j<n; j++){
-                if(targets[i][j]){
+                // 只对标记的进行缩放动画：即合并产生的新数字块、新生成的一个数字块
+                if(targets[i][j]!=0){
+                    // 大小插值
                     double wh = (gridSize - gap) * (curf+3.0) / (frameNum-1.0);
+                    // 中心位置不变，但左上角位置还得重新计算
                     rects[i][j].setX(int(o + j*gridSize + (gridSize-gap - wh)/2.0));
                     rects[i][j].setY(int(o + i*gridSize + (gridSize-gap - wh)/2.0));
                     rects[i][j].setSize(QSize(int(wh), int(wh)));
                 }else{
+                    // 其他的不动
                     rects[i][j].setRect(o + j*gridSize, o + i*gridSize, gridSize-gap, gridSize-gap);
                 }
             }
         }
-        update();
     }else{
+        // 动画结束则关闭定时器
         timer->stop();
-        update();
     }
+    // 更新
+    update();
 }
 
 
@@ -235,9 +250,10 @@ void MyWidget::paintEvent(QPaintEvent *e){
     QRect r; 
     double fontSize;
 
-    // 空白棋盘：都是 0 的底色
+    // 先绘制空白棋盘：都是 0 的底色
     for(int i=0; i<n; i++){
         for(int j=0; j<n; j++){
+            // 计算位置
             r.setRect(o + j*gridSize, o + i*gridSize, gridSize-gap, gridSize-gap);
             // 外框颜色：透明
             painter.setPen(Qt::transparent);
@@ -248,47 +264,58 @@ void MyWidget::paintEvent(QPaintEvent *e){
     }
 
 
+    // 再绘制数字块
     for(int i=0; i<n; i++){
         for(int j=0; j<n; j++){
+            // 移动帧：绘制的是 oldGrids 的移动
             if(mode==1){
-                //
                 if(oldGrids[i][j]==0) continue;
+                // 底色
                 painter.setPen(Qt::transparent);
                 painter.setBrush(bg[oldGrids[i][j]]);
                 painter.drawRect(rects[i][j]);
-                // 数字颜色、字体
+                // 数值
                 fontSize = (60-10*int(log10(oldGrids[i][j])))*fontRatio;
                 painter.setPen(Qt::black);
                 painter.setFont(QFont("Consolas", int(fontSize))); // 6-20, 5-25, 4-30, 3-40, 2-50, 1-60
                 painter.drawText(QRectF(rects[i][j]), QString::number(oldGrids[i][j]), QTextOption(Qt::AlignCenter));
             }
+            // 缩放帧：绘制的是 newGrids 的缩放
             else if(mode==2){
                 if(newGrids[i][j]==0) continue;
                 r.setRect(o + j*gridSize, o + i*gridSize, gridSize-gap, gridSize-gap);
-                if(newGrids[i][j]!=2){
+                // 合并生成的，在缩放动画时，也要绘制 oldGrids，此时其数值是 newGrids 的一半
+                if(targets[i][j]==2){
+                    // 底色
                     painter.setPen(Qt::transparent);
                     painter.setBrush(bg[int(newGrids[i][j]/2)]);
                     painter.drawRect(r);
+                    // 数值
                     fontSize = (60-10*int(log10(newGrids[i][j]/2)))*fontRatio;
                     painter.setPen(Qt::black);
                     painter.setFont(QFont("Consolas", int(fontSize))); // 6-20, 5-25, 4-30, 3-40, 2-50, 1-60
                     painter.drawText(QRectF(r), QString::number(int(newGrids[i][j]/2)), QTextOption(Qt::AlignCenter));
                 }
+                // 底色
                 painter.setPen(Qt::transparent);
                 painter.setBrush(bg[newGrids[i][j]]);
                 painter.drawRect(rects[i][j]);
+                // 数值
                 fontSize = (60-10*int(log10(newGrids[i][j])))*fontRatio;
-                fontSize = targets[i][j] ? fontSize*((curf+1.0)/(frameNum-1.0)) : fontSize;
+                fontSize = targets[i][j]!=0 ? fontSize*((curf+1.0)/(frameNum-1.0)) : fontSize;
                 painter.setPen(Qt::black);
                 painter.setFont(QFont("Consolas", int(fontSize))); // 6-20, 5-25, 4-30, 3-40, 2-50, 1-60
                 painter.drawText(QRectF(rects[i][j]), QString::number(newGrids[i][j]), QTextOption(Qt::AlignCenter));
-            }else if(mode==0){
+            }
+            // 再绘制一帧最终结果帧
+            else if(mode==0){
                 if(newGrids[i][j]==0) continue;
                 r.setRect(o + j*gridSize, o + i*gridSize, gridSize-gap, gridSize-gap);
+                // 底色
                 painter.setPen(Qt::transparent);
                 painter.setBrush(bg[newGrids[i][j]]);
                 painter.drawRect(r);
-                // 数字颜色、字体
+                // 数值
                 fontSize = (60-10*int(log10(newGrids[i][j])))*fontRatio;
                 painter.setPen(Qt::black);
                 painter.setFont(QFont("Consolas", int(fontSize))); // 6-20, 5-25, 4-30, 3-40, 2-50, 1-60
@@ -296,7 +323,19 @@ void MyWidget::paintEvent(QPaintEvent *e){
             }
         }
     }
+
+    /**
+     * 在这里改变变量 curf mode，有一个奇效：
+     * 不管操作是否多快，paintEvent 是否丢帧了，
+     * 只要执行了，就是连续的，则动画就是完整的。
+     * 因为，curf 是在这里改变的，
+     * 丢帧，则 curf 没变，下一次 timeout 还是绘制丢弃的帧
+     * 所以，不管哪一次 paintEvent 被丢了，都会继续绘制相同的内容，
+     * 最终动画是连续的、完整的
+     */
+    // 继续下一帧
     curf++;
+    // 动画结束切换模式
     if(mode==1 && curf==frameNum){
         mode = 2;
         curf = 0;
@@ -308,9 +347,8 @@ void MyWidget::paintEvent(QPaintEvent *e){
 
     // score->setText(QString::number(game.getScore()));
     // step->setText(QString::number(game.getStep()));
-    score->setText(QString::number(nscore));
-    step->setText(QString::number(nstep));
 
+    // 绘制结束界面
     if(over){
         r.setRect(int(winRatio*500*0.1), int(winRatio*500*0.35), int(winRatio*500*0.8), int(winRatio*500*0.3));
         // 外框颜色：透明

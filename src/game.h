@@ -1,14 +1,13 @@
 /**
  * @file game.h
- * @brief The core class of the game
- * @author Gzding (gzding5.yeah.net)
- * @version 0.1
- * @date 2023-10-28
+ * @brief core class of the game 
+ * @author Gzding (gzding5@yeah.net)
+ * @version 2.0
+ * @date 2023-10-31
  * 
  * @copyright Copyright (c) 2023
  * 
  */
-
 
 #ifndef GAME_H
 #define GAME_H
@@ -25,6 +24,7 @@
  * @paragraph 核心逻辑
  * @par - 游戏初始化：使用随机生成方法，随机生成两个数字 2 在棋盘上；
  * @par - 移动合并操作：根据操作方向（键盘上下左右键），移动、合并所有数字；
+ * @par - 动画功能：在移动合并时记录过程信息，以便后续添加动画功能；
  * @par - 随机生成：随机生成数字，概率可根据游戏进度（目前最大数值）调整；
  * @par - 结束判断：棋盘满了，且无法在任何方向继续合并；
  */
@@ -42,8 +42,6 @@ private:
     int score;          /// @brief 得分
     int step;           /// @brief 有效操作步数
     bool state;         /// @brief 游戏状态：true-正常、false-结束
-    std::vector<std::vector<std::vector<int> > > paths;
-    std::vector<std::vector<bool> > targets;
 public:
     /**
      * @brief Construct a new Game
@@ -77,8 +75,6 @@ public:
     bool getState();
     /// @brief 获取 棋盘数值矩阵
     std::vector<std::vector<int> > getGrids();
-    std::vector<std::vector<bool> > getTargets();
-    std::vector<std::vector<std::vector<int> > > getPaths();
     /// @brief 在字符界面以字符方式打印棋盘。可以实现字符界面版的游戏。
     void print();
 private:
@@ -92,7 +88,20 @@ private:
     int getRandomNum(int n);
     /// @brief 检查 target 是否大于等于 2048 且是 2 的 n 次幂
     bool checkTarget();
+
+#define __ANIMATION__
+#ifdef __ANIMATION__
+private:
+    /// @brief 每次 moveTo 有效操作时，记录每个方块在下个状态的位置
+    std::vector<std::vector<std::vector<int> > > paths;
+    /// @brief 标记生成目标的位置，即: 2-合并产生的、1-新生成的方块, 的位置标记
+    std::vector<std::vector<int> > targets;
+    /// @brief 重置 paths targets
     void reset();
+public:
+    std::vector<std::vector<int> > getTargets();
+    std::vector<std::vector<std::vector<int> > > getPaths();
+#endif
 };
 
 #endif // GAME_H
