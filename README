@@ -1,6 +1,7 @@
 # To2048
 
-To2048 game developed by Qt C++.
+> To2048 game with animation developed by Qt C++.
+>
 
 Environment
 
@@ -32,14 +33,5 @@ Environment
     - don't forget copping img dir when packing the exe file
 
 
-
-
-
-## TODO LIST
-
-### Animation
-
-
-### Optimize
 
 
