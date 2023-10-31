@@ -11,12 +11,17 @@
 
 #pragma once
 
+#include "game.h"
+
 #include <QWidget>
 #include <QPaintEvent>
 #include <QLabel>
 #include <QMap>
+#include <QTimer>
+#include <QRect>
+#include <QVector>
 
-#include "game.h"
+#include <vector>
 
 /**
  * @brief 给游戏创建 ui 界面和交互控制
@@ -36,7 +41,7 @@ class MyWidget : public QWidget
     Q_OBJECT
 public:
     explicit MyWidget(QWidget *parent = nullptr);
-
+    ~MyWidget();
 public:
     /**
      * @brief 重写父类 QWidget 的 paintEvent，绘制棋盘，显示当前棋局
@@ -67,6 +72,21 @@ private:
     int gap;            // 格子间隔
     int o;              // 棋盘左上角在本 widget 中的开始坐标
     QMap<int, QColor> bg; // 格子的底色
+    Game::Direction direct;
+    int nstep;
+    int nscore;
+    std::vector<std::vector<int> > oldGrids;
+    std::vector<std::vector<int> > newGrids;
+    std::vector<std::vector<bool> > targets;
+    std::vector<std::vector<std::vector<int> > > paths;
+    QVector<QVector<QRect> > rects;
+    QTimer *timer;
+    int frameNum;
+    int curf;
+    int mode;
+
+private:
+    void timerTimeout();
 
 private:
     /// @brief 游戏结束时置为 true

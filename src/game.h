@@ -42,6 +42,8 @@ private:
     int score;          /// @brief 得分
     int step;           /// @brief 有效操作步数
     bool state;         /// @brief 游戏状态：true-正常、false-结束
+    std::vector<std::vector<std::vector<int> > > paths;
+    std::vector<std::vector<bool> > targets;
 public:
     /**
      * @brief Construct a new Game
@@ -75,6 +77,8 @@ public:
     bool getState();
     /// @brief 获取 棋盘数值矩阵
     std::vector<std::vector<int> > getGrids();
+    std::vector<std::vector<bool> > getTargets();
+    std::vector<std::vector<std::vector<int> > > getPaths();
     /// @brief 在字符界面以字符方式打印棋盘。可以实现字符界面版的游戏。
     void print();
 private:
@@ -88,6 +92,7 @@ private:
     int getRandomNum(int n);
     /// @brief 检查 target 是否大于等于 2048 且是 2 的 n 次幂
     bool checkTarget();
+    void reset();
 };
 
 #endif // GAME_H

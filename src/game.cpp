@@ -22,6 +22,8 @@ Game::Game(int size, int target){
         exit(1);
     }
     grids = vector<vector<int> >(size, vector<int>(size));
+    paths = vector<vector<vector<int> > >(size, vector<vector<int> >(size, vector<int>(2)));
+    targets = vector<vector<bool> >(size, vector<bool>(size));
 }
 
 Game::~Game(){}
@@ -39,10 +41,185 @@ void Game::init(){
             grids[i][j] = 0;
         }
     }
+    reset();
     // 随机选择两个格子填充 2
     generate();
     generate();
 }
+
+void Game::reset(){
+    for(int i=0; i<size; i++){
+        for(int j=0; j<size; j++){
+            paths[i][j][0] = i;
+            paths[i][j][1] = j;
+            targets[i][j] = false;
+        }
+    }
+}
+
+bool Game::moveTo(Direction dir){
+    if(state == false) return false;
+
+    // 是否移动、合并的标志
+    bool move = false;
+    bool merge = false;
+
+    reset();
+    // 根据操作方向，先移动，后合并
+    switch(dir){
+        case left:{
+            // 向左移动
+            // 对于每一行分别将非零值都移动到最左边
+            for(int i=0; i<size; i++){
+                int zero = 0; // 记录上次开始寻找 0 值的位置
+                for(int j=1; j<size; j++){
+                    if(grids[i][j] == 0) continue;
+                    // 将当前非零值 grids[i][j] 移动到从头开始的第一个 0 的位置 或者是 与相同值合并
+                    for(int pre=zero; pre<j; pre++){
+                        if(grids[i][pre]==0 || grids[i][pre]==grids[i][j]){
+                            if(grids[i][j]==grids[i][pre]){
+                                zero = pre+1;
+                                targets[i][pre] = true;
+                                blankNum++;
+                                score += 2*grids[i][j];
+                                maxNum = (maxNum > grids[i][j]*2) ? maxNum : grids[i][j]*2;
+                            }
+                            move = true; // 设置标记
+                            // 移动
+                            grids[i][pre] += grids[i][j];
+                            grids[i][j] = 0;
+                            paths[i][j][0] = i;
+                            paths[i][j][1] = pre;
+                            break;
+                        }else{
+                            zero++;
+                        }
+                    }
+                }
+            }
+        }break;
+        // 其他三个方向一样的步骤
+        case right:{
+            // 向左移动
+            // 对于每一行分别将非零值都移动到最左边
+            for(int i=0; i<size; i++){
+                int zero = size-1; // 记录上次开始寻找 0 值的位置
+                for(int j=size-2; j>=0; j--){
+                    if(grids[i][j] == 0) continue;
+                    // 将当前非零值 grids[i][j] 移动到从头开始的第一个 0 的位置 或者是 与相同值合并
+                    for(int pre=zero; pre>j; pre--){
+                        if(grids[i][pre]==0 || grids[i][pre]==grids[i][j]){
+                            if(grids[i][j]==grids[i][pre]){
+                                zero = pre-1;
+                                targets[i][pre] = true;
+                                blankNum++;
+                                score += 2*grids[i][j];
+                                maxNum = (maxNum > grids[i][j]*2) ? maxNum : grids[i][j]*2;
+                            }
+                            move = true; // 设置标记
+                            // 移动
+                            grids[i][pre] += grids[i][j];
+                            grids[i][j] = 0;
+                            paths[i][j][0] = i;
+                            paths[i][j][1] = pre;
+                            break;
+                        }else{
+                            zero--;
+                        }
+                    }
+                }
+            }
+        }break;
+        case up:{
+            // 向左移动
+            // 对于每一行分别将非零值都移动到最左边
+            for(int j=0; j<size; j++){
+                int zero = 0; // 记录上次开始寻找 0 值的位置
+                for(int i=1; i<size; i++){
+                    if(grids[i][j] == 0) continue;
+                    // 将当前非零值 grids[i][j] 移动到从头开始的第一个 0 的位置 或者是 与相同值合并
+                    for(int pre=zero; pre<i; pre++){
+                        if(grids[pre][j]==0 || grids[pre][j]==grids[i][j]){
+                            if(grids[i][j]==grids[pre][j]){
+                                zero = pre+1;
+                                targets[pre][j] = true;
+                                blankNum++;
+                                score += 2*grids[i][j];
+                                maxNum = (maxNum > grids[i][j]*2) ? maxNum : grids[i][j]*2;
+                            }
+                            move = true; // 设置标记
+                            // 移动
+                            grids[pre][j] += grids[i][j];
+                            grids[i][j] = 0;
+                            paths[i][j][0] = pre;
+                            paths[i][j][1] = j;
+                            break;
+                        }else{
+                            zero++;
+                        }
+                    }
+                }
+            }
+        }break;
+        case down:{
+            // 向左移动
+            // 对于每一行分别将非零值都移动到最左边
+            for(int j=0; j<size; j++){
+                int zero = size-1; // 记录上次开始寻找 0 值的位置
+                for(int i=size-2; i>=0; i--){
+                    if(grids[i][j] == 0) continue;
+                    // 将当前非零值 grids[i][j] 移动到从头开始的第一个 0 的位置 或者是 与相同值合并
+                    for(int pre=zero; pre>i; pre--){
+                        if(grids[pre][j]==0 || grids[pre][j]==grids[i][j]){
+                            if(grids[i][j]==grids[pre][j]){
+                                zero = pre-1;
+                                targets[pre][j] = true;
+                                blankNum++;
+                                score += 2*grids[i][j];
+                                maxNum = (maxNum > grids[i][j]*2) ? maxNum : grids[i][j]*2;
+                            }
+                            move = true; // 设置标记
+                            // 移动
+                            grids[pre][j] += grids[i][j];
+                            grids[i][j] = 0;
+                            paths[i][j][0] = pre;
+                            paths[i][j][1] = j;
+                            break;
+                        }else{
+                            zero--;
+                        }
+                    }
+                }
+            }
+        }break;
+        default:{
+            cout << "ERROR: error direction" << endl;
+            // but do nothing
+        }
+    }
+
+    // 有效操作则：
+    if(move || merge){
+        // 更新 step
+        step++;
+        if(isSuccess()==false){
+            // 生成一个新的 
+            generate();
+            // 更新游戏状态
+            check();
+        }else{
+            // 成功了，也要设置 state
+            state = false;
+        }
+    }
+    
+    return move || merge;
+}
+
+
+
+#ifdef __OLDMOVETO__
+
 
 bool Game::moveTo(Direction dir){
     if(state == false) return false;
@@ -253,6 +430,7 @@ bool Game::moveTo(Direction dir){
         }break;
         default:{
             cout << "ERROR: error direction" << endl;
+            // but do nothing
         }
     }
 
@@ -273,6 +451,10 @@ bool Game::moveTo(Direction dir){
     
     return move || merge;
 }
+
+
+#endif
+
 
 bool Game::isSuccess(){
     return maxNum==target;
@@ -316,6 +498,7 @@ void Game::generate(){
             if(grids[i][j] == 0){
                 if(index==0){
                     grids[i][j] = num;
+                    targets[i][j] = true;
                     // 更新 blankNum
                     blankNum--;
                     return;
@@ -342,6 +525,17 @@ int Game::getScore(){
 vector<vector<int> > Game::getGrids(){
     return grids;
 }
+
+vector<vector<bool> > Game::getTargets(){
+    return targets;
+}
+
+vector<vector<vector<int> > > Game::getPaths(){
+    return paths;
+}
+
+
+
 
 // 打印棋盘格子
 void Game::print(){
